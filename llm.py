@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 from dataclasses import dataclass, field
+from typing import List
 
 from openai import AsyncOpenAI
 from PIL import Image
@@ -30,6 +31,25 @@ class Message:
     text: str
     image_urls: list[str] = field(default_factory=list)
     image_b64s: list[str] = field(default_factory=list)
+
+
+class FourEars(BaseModel):
+    sender: str
+    factual_information: str
+    self_revelation: str
+    relationship: str
+    appeal: str
+    bid_for_connection: str
+
+
+class Continuation(BaseModel):
+    sender: str
+    example_continuations: List[str]
+
+
+class AnalysisResult(BaseModel):
+    analysis: List[FourEars]
+    continuations: List[Continuation]
 
 
 async def query_llm(
@@ -62,21 +82,3 @@ async def query_llm(
         )
         assert res.output_text is not None, f"Output text is None for {input}"
         return res.output_text
-
-
-if __name__ == "__main__":
-
-    class ResponseFormat(BaseModel):
-        name: str
-        description: str
-
-    history = [
-        Message(
-            text="What is the capital of France?",
-            image_urls=[
-                "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?fm=jpg&q=60&w=3000&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8cGFyaXN8ZW58MHx8MHx8fDA%3D"
-            ],
-        )
-    ]
-    result = asyncio.run(query_llm(history, "gpt-4o", ResponseFormat))
-    print(result)
