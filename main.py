@@ -4,6 +4,7 @@ import os
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command
+from aiogram.types import BotCommand
 from dotenv import load_dotenv
 
 from llm import Message as LLMMessage
@@ -21,6 +22,14 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 message_buffer = {}
+
+
+async def set_main_menu(bot: Bot):
+    main_menu_commands = [
+        BotCommand(command="/start", description="Start the bot"),
+        BotCommand(command="/empathize", description="Analyze forwarded messages"),
+    ]
+    await bot.set_my_commands(main_menu_commands)
 
 
 async def process_messages_with_llm(messages: list[tuple[str, str]]) -> str:
@@ -45,7 +54,7 @@ Here is the conversation:
 """
 
     history = [LLMMessage(text=prompt)]
-    analysis = await query_llm(history, "gpt-4.5")
+    analysis = await query_llm(history, "o4-mini")
     return analysis
 
 
@@ -91,6 +100,7 @@ async def handle_forwarded_messages(message: types.Message):
 
 
 async def main():
+    await set_main_menu(bot)
     await dp.start_polling(bot)
 
 
