@@ -3,7 +3,7 @@ import logging
 import os
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters.command import Command
+from aiogram.filters.command import Command, CommandObject
 from aiogram.types import BotCommand
 from dotenv import load_dotenv
 
@@ -22,39 +22,46 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 message_buffer = {}
+user_model_selection = {}
 
 
 async def set_main_menu(bot: Bot):
     main_menu_commands = [
         BotCommand(command="/start", description="Start the bot"),
         BotCommand(command="/empathize", description="Analyze forwarded messages"),
+        BotCommand(
+            command="/model",
+            description="Set the model for analysis (e.g., /model gpt-4o)",
+        ),
     ]
     await bot.set_my_commands(main_menu_commands)
 
 
-async def process_messages_with_llm(messages: list[tuple[str, str]]) -> str:
+async def process_messages_with_llm(
+    messages: list[tuple[str, str]], model_name: str
+) -> str:
     if not messages:
         return "No messages to process."
 
     conversation = "\n".join([f"{sender}: {text}" for sender, text in messages])
 
-    prompt = f"""Analyze the following conversation using Schulz von Thun's four-sides model (the "4-ear model"). For each message, please analyze the four layers:
+    prompt = f"""Проанализируй следующий диалог, используя четырехстороннюю модель Шульца фон Туна ("модель 4 ушей"). Для каждого сообщения проанализируй четыре уровня:
 
-1.  **Factual Information**: What is the literal, objective content of the message?
-2.  **Self-Revelation**: What does the message reveal about the sender's personality, values, emotions, or current state?
-3.  **Relationship**: What does the message imply about the relationship between the sender and receiver? How does the sender view the receiver?
-4.  **Appeal**: What does the sender want the receiver to do, think, or feel? What is the underlying request or bid for connection?
+1.  **Фактическая информация**: Каково буквальное, объективное содержание сообщения?
+2.  **Самораскрытие**: Что сообщение говорит о личности, ценностях, эмоциях или текущем состоянии отправителя?
+3.  **Отношения**: Что сообщение подразумевает об отношениях между отправителем и получателем? Как отправитель воспринимает получателя?
+4.  **Призыв**: Что отправитель хочет, чтобы получатель сделал, подумал или почувствовал? Каков основной запрос или заявка на установление контакта?
 
-Based on this model, provide a summary of what each person might have been thinking, what their bids for connection were, and what their underlying requests might be.
+Основываясь на этой модели, предоставь резюме того, о чем мог думать каждый человек, каковы были его заявки на установление контакта и каковы могли быть его основные запросы.
 
-Finally, for each side of the conversation, provide a few example responses in Russian.
+В конце для каждой стороны диалога предложи несколько примеров ответов на русском языке, направленных на деэскалацию ситуации, проявление эмпатии и открытие пути для конструктивного диалога.
 
-Here is the conversation:
+Вот диалог:
 {conversation}
 """
 
     history = [LLMMessage(text=prompt)]
-    analysis = await query_llm(history, "o4-mini")
+    analysis = await query_llm(history, model_name)
     return analysis
 
 
@@ -63,6 +70,20 @@ async def cmd_start(message: types.Message):
     await message.answer(
         "Hello! Forward me some messages. When you're ready, use the /empathize command to get a summary."
     )
+
+
+@dp.message(Command("model"))
+async def cmd_model(message: types.Message, command: CommandObject):
+    user_id = message.from_user.id
+    if command.args:
+        model_name = command.args
+        user_model_selection[user_id] = model_name
+        await message.answer(f"Model set to: {model_name}")
+    else:
+        current_model = user_model_selection.get(user_id, "gpt-4.1")
+        await message.answer(
+            f"Current model: {current_model}. To set a new model, use /model <modelname>."
+        )
 
 
 @dp.message(Command("empathize"))
@@ -74,9 +95,12 @@ async def cmd_empathize(message: types.Message):
         await message.answer("Your buffer is empty. Forward some messages first.")
         return
 
-    await message.answer(f"Processing {len(buffered_messages)} messages...")
+    model_name = user_model_selection.get(user_id, "gpt-4.1")
+    await message.answer(
+        f"Processing {len(buffered_messages)} messages with {model_name}..."
+    )
 
-    analysis = await process_messages_with_llm(buffered_messages)
+    analysis = await process_messages_with_llm(buffered_messages, model_name)
     await message.answer(analysis)
 
     message_buffer[user_id] = []
