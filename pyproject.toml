@@ -1,0 +1,7 @@
+[project]
+name = "bidder"
+version = "0.1.0"
+dependencies = [
+    "aiogram",
+    "python-dotenv",
+]
