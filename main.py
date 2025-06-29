@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command
 
+from llm import Message as LLMMessage, query_llm
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -25,13 +27,23 @@ dp = Dispatcher()
 # In-memory buffer for messages, keyed by user ID
 message_buffer = {}
 
-def process_messages(messages: list[tuple[str, str]]) -> str:
+async def process_messages_with_llm(messages: list[tuple[str, str]]) -> str:
     """
-    Processes a list of messages and returns a single summary string.
+    Processes a list of messages with an LLM and returns a single summary string.
     """
     if not messages:
         return "No messages to process."
-    return "\n".join([f"{sender}: {text}" for sender, text in messages])
+
+    history = [LLMMessage(text=f"{sender}: {text}") for sender, text in messages]
+    
+    # Prepend a system prompt to guide the LLM
+    # The current llm.py implementation will send this as a user message.
+    prompt = "Summarize the following messages, extracting the key points and any action items."
+    history.insert(0, LLMMessage(text=prompt))
+
+    # Using gpt-4o as a default, this can be changed.
+    summary = await query_llm(history, "gpt-4o")
+    return summary
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -52,7 +64,9 @@ async def cmd_empathize(message: types.Message):
         await message.answer("Your buffer is empty. Forward some messages first.")
         return
 
-    summary = process_messages(buffered_messages)
+    await message.answer(f"Processing {len(buffered_messages)} messages...")
+
+    summary = await process_messages_with_llm(buffered_messages)
     await message.answer(summary)
 
     # Clear the buffer for the user
@@ -78,9 +92,10 @@ async def handle_forwarded_messages(message: types.Message):
         if user_id not in message_buffer:
             message_buffer[user_id] = []
         message_buffer[user_id].append((sender, text))
-        await message.answer(f"Added message from {sender} to the buffer.")
+        # Silently accept the message
     else:
-        await message.answer("Please forward a message. Use /empathize to process.")
+        # Ignore non-forwarded messages
+        pass
 
 
 async def main():

@@ -4,4 +4,7 @@ version = "0.1.0"
 dependencies = [
     "aiogram",
     "python-dotenv",
+    "openai",
+    "pillow",
+    "pydantic",
 ]
