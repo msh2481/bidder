@@ -38,6 +38,8 @@ async def process_messages_with_llm(messages: list[tuple[str, str]]) -> str:
 
 Based on this model, provide a summary of what each person might have been thinking, what their bids for connection were, and what their underlying requests might be.
 
+Finally, for each side of the conversation, provide a few example responses in Russian.
+
 Here is the conversation:
 {conversation}
 """
