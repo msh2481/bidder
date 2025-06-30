@@ -26,6 +26,27 @@ message_buffer = {}
 user_model_selection = {}
 
 
+async def send_long_message(message: types.Message, text: str, parse_mode: str | None = None):
+    if len(text) <= 500:
+        await message.answer(text, parse_mode=parse_mode)
+        return
+
+    lines = text.split('\n')
+    message_block = ""
+    for line in lines:
+        if len(message_block) + len(line) + 1 > 500:
+            if message_block:
+                await message.answer(message_block, parse_mode=parse_mode)
+            message_block = line
+        else:
+            if message_block:
+                message_block += "\n"
+            message_block += line
+    
+    if message_block:
+        await message.answer(message_block, parse_mode=parse_mode)
+
+
 async def set_main_menu(bot: Bot):
     main_menu_commands = [
         BotCommand(command="/start", description="Start the bot"),
@@ -125,7 +146,7 @@ async def cmd_empathize(message: types.Message):
     )
 
     analysis = await process_messages_with_llm(buffered_messages, model_name)
-    await message.answer(analysis, parse_mode="Markdown")
+    await send_long_message(message, analysis, parse_mode="Markdown")
 
     message_buffer[user_id] = []
 
