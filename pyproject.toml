@@ -9,4 +9,5 @@ dependencies = [
     "pillow",
     "pydantic",
     "loguru>=0.7.3",
+    "apscheduler",
 ]
