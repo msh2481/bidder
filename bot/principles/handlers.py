@@ -316,16 +316,3 @@ async def cmd_test_principle(message: Message, bot: Bot):
 
     logger.info("Sending test principle '{}' to user {}", principle.title, user_id)
     await send_principle_message(bot, user_id, item)
-
-
-@router.message(Command("update_principles"))
-async def cmd_update_principles_legacy(message: Message):
-    """Legacy command - redirect to new workflow."""
-    await message.answer(
-        "ℹ️ **The principles system has been updated!**\n\n"
-        "**New workflow:**\n"
-        "• Use /add_principle to add principles one by one\n"
-        "• Use /remove_principle <id> to remove specific principles\n"
-        "• Use /principles to see all your principles\n\n"
-        "This avoids message length limits and makes management easier!"
-    )
