@@ -1,19 +1,17 @@
 import asyncio
 import json
-import logging
 import random
 import re
 from pathlib import Path
 
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from loguru import logger
 
 from ..common.config import DATA_DIR, SERVER_TZINFO
 from ..common.utils import send_chunked_html_message
 from .parser import PrincipleItem, parse_principles
 from .storage import load_raw_principles
-
-logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone=SERVER_TZINFO)
 
@@ -26,10 +24,16 @@ async def send_daily_principle_job(bot: Bot, user_id: int) -> None:
     """Cron-fired once per day per user at their HH:MM with random delay."""
     # Random delay 0..3600 seconds
     delay = random.randint(0, 3600)
+    logger.info(
+        "Daily principle job triggered for user {}, sleeping for {} seconds",
+        user_id,
+        delay,
+    )
     await asyncio.sleep(delay)
 
     raw = load_raw_principles(user_id)
     if not raw:
+        logger.warning("User {} has no principles stored", user_id)
         try:
             await bot.send_message(
                 user_id,
@@ -37,12 +41,13 @@ async def send_daily_principle_job(bot: Bot, user_id: int) -> None:
             )
         except Exception as e:
             logger.warning(
-                "Failed to notify user %s about missing principles: %s", user_id, e
+                "Failed to notify user {} about missing principles: {}", user_id, e
             )
         return
 
     items = parse_principles(raw)
     if not items:
+        logger.warning("User {} has no parseable principles", user_id)
         try:
             await bot.send_message(
                 user_id,
@@ -51,15 +56,17 @@ async def send_daily_principle_job(bot: Bot, user_id: int) -> None:
             )
         except Exception as e:
             logger.warning(
-                "Failed to notify user %s about parsing issue: %s", user_id, e
+                "Failed to notify user {} about parsing issue: {}", user_id, e
             )
         return
 
     item = random.choice(items)
+    logger.info("Sending principle '{}' to user {}", " -> ".join(item.path), user_id)
     try:
         await send_principle_message(bot, user_id, item)
+        logger.info("Successfully sent daily principle to user {}", user_id)
     except Exception as e:
-        logger.error("Failed sending principle to %s: %s", user_id, e)
+        logger.error("Failed sending principle to {}: {}", user_id, e)
 
 
 async def send_principle_message(bot: Bot, chat_id: int, item: PrincipleItem) -> None:
@@ -123,9 +130,11 @@ def load_existing_schedules(bot: Bot) -> int:
 
 def start_scheduler():
     """Start the scheduler."""
+    logger.info("Starting APScheduler...")
     scheduler.start()
 
 
 def shutdown_scheduler():
     """Shutdown the scheduler."""
+    logger.info("Shutting down APScheduler...")
     scheduler.shutdown(wait=False)

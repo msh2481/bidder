@@ -2,3 +2,4 @@
 .venv
 *.lock
 __pycache__
+test.txt

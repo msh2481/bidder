@@ -1,3 +1,5 @@
+from loguru import logger
+
 from llm import AnalysisResult
 from llm import Message as LLMMessage
 from llm import query_llm
@@ -7,10 +9,16 @@ async def process_messages_with_llm(
     messages: list[tuple[str, str]], model_name: str
 ) -> str:
     """Process messages using LLM for empathy analysis."""
+    logger.info(
+        "Starting LLM processing with {} messages using model {}",
+        len(messages),
+        model_name,
+    )
     if not messages:
         return "No messages to process."
 
     conversation = "\n".join([f"{sender}: {text}" for sender, text in messages])
+    logger.debug("Conversation length: {} characters", len(conversation))
 
     prompt = f"""Проанализируй следующий диалог, используя четырехстороннюю модель Шульца фон Туна ("модель 4 ушей"). Для каждого сообщения проанализируй четыре уровня:
 
@@ -28,10 +36,18 @@ async def process_messages_with_llm(
 """
 
     history = [LLMMessage(text=prompt)]
+    logger.info("Sending request to LLM...")
     analysis_result = await query_llm(history, model_name, text_format=AnalysisResult)
 
     if isinstance(analysis_result, str):
+        logger.info("LLM returned string response")
         return analysis_result
+
+    logger.info(
+        "LLM returned structured analysis with {} analysis items and {} continuations",
+        len(analysis_result.analysis),
+        len(analysis_result.continuations),
+    )
 
     response_parts = []
     for analysis in analysis_result.analysis:

@@ -1,11 +1,11 @@
 import asyncio
-import logging
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 from dotenv import load_dotenv
+from loguru import logger
 
 from bot.common.config import BOT_TOKEN
 
@@ -22,15 +22,18 @@ from bot.principles.scheduler import (
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+# Configure loguru
+logger.remove()  # Remove default handler
+logger.add(
+    sink=lambda msg: print(msg, end=""),
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>",
+    level="INFO",
 )
-logger = logging.getLogger("merged-bot")
 
 
 async def set_main_menu(bot: Bot):
     """Set the main menu commands."""
+    logger.info("Setting up main menu commands")
     main_menu_commands = [
         BotCommand(command="/start", description="Start the bot"),
         BotCommand(command="/help", description="Show help"),
@@ -45,11 +48,13 @@ async def set_main_menu(bot: Bot):
         BotCommand(command="/test_principle", description="Send random principle now"),
     ]
     await bot.set_my_commands(main_menu_commands)
+    logger.info("Main menu commands set successfully")
 
 
 @empathy_router.message(Command("start"))
 async def cmd_start(message: types.Message):
     """Start command handler."""
+    logger.info("Start command received from user {}", message.from_user.id)
     await message.answer(
         "Hello! I'm a multi-purpose bot with two main features:\n\n"
         "🧠 **Empathy Analysis**\n"
@@ -67,6 +72,7 @@ async def cmd_start(message: types.Message):
 @empathy_router.message(Command("help"))
 async def cmd_help(message: types.Message):
     """Help command handler."""
+    logger.info("Help command received from user {}", message.from_user.id)
     await message.answer(
         "**Available Commands:**\n\n"
         "**General:**\n"
@@ -91,19 +97,33 @@ async def cmd_help(message: types.Message):
 @empathy_router.message()
 async def handle_all_messages(message: types.Message):
     """Handle all other messages - check if they're forwarded messages for empathy analysis."""
+    logger.debug(
+        "Handling message from user {} (type: {})",
+        message.from_user.id,
+        type(message.content_type),
+    )
     # Try to handle as forwarded message for empathy analysis
     handled = handle_forwarded_message(message)
-    if not handled:
-        # If not a forwarded message, let FSM handlers in principles module handle it
-        pass
+    if handled:
+        logger.info(
+            "Message from user {} handled as forwarded message for empathy analysis",
+            message.from_user.id,
+        )
+    else:
+        logger.debug(
+            "Message from user {} not a forwarded message, passing to FSM handlers",
+            message.from_user.id,
+        )
 
 
 async def main():
     """Main bot function."""
+    logger.info("Starting merged bot...")
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
     # Include routers
+    logger.info("Including routers...")
     dp.include_router(empathy_router)
     dp.include_router(principles_router)
 
@@ -111,15 +131,23 @@ async def main():
     await set_main_menu(bot)
 
     # Start scheduler and restore existing schedules
+    logger.info("Starting scheduler...")
     start_scheduler()
     restored = load_existing_schedules(bot)
-    logger.info("Restored %d scheduled users from disk", restored)
+    logger.info("Restored {} scheduled users from disk", restored)
 
     # Start polling
+    logger.info("Starting bot polling...")
     try:
         await dp.start_polling(bot)
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error("Bot stopped due to error: {}", e)
     finally:
+        logger.info("Shutting down scheduler...")
         shutdown_scheduler()
+        logger.info("Bot shutdown complete")
 
 
 if __name__ == "__main__":

@@ -60,3 +60,11 @@ def parse_principles(md_text: str) -> list[PrincipleItem]:
     # Keep only items that have at least one heading in the path and non-empty text
     items = [it for it in items if it.path and it.text.strip()]
     return items
+
+
+if __name__ == "__main__":
+    with open("test.txt", "r") as f:
+        md_text = f.read()
+    items = parse_principles(md_text)
+    for item in items:
+        print(item.path, len(item.text))

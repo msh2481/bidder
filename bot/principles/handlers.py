@@ -9,6 +9,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
+from loguru import logger
 
 from ..common.config import SERVER_TZINFO
 from .parser import parse_principles
@@ -35,6 +36,7 @@ class TimeStates(StatesGroup):
 async def cmd_principles(message: Message):
     """Show current principles status."""
     user_id = message.from_user.id
+    logger.info("Principles status command received from user {}", user_id)
     raw = load_raw_principles(user_id)
     time_config = load_time_config(user_id)
 
@@ -61,6 +63,8 @@ async def cmd_principles(message: Message):
 @router.message(Command("update_principles"))
 async def cmd_update_principles(message: Message, state: FSMContext):
     """Start the process of updating principles."""
+    user_id = message.from_user.id
+    logger.info("Update principles command received from user {}", user_id)
     await state.set_state(UpdateStates.waiting_for_principles)
     await message.answer(
         "Please send your principles in a Markdown-like outline, for example:\n\n"
@@ -84,8 +88,12 @@ async def receive_principles(message: Message, state: FSMContext):
     """Receive and save principles text."""
     user_id = message.from_user.id
     raw = message.text.strip()
+    logger.info(
+        "Received principles text from user {} (length: {} chars)", user_id, len(raw)
+    )
     save_raw_principles(user_id, raw)
     items = parse_principles(raw)
+    logger.info("Parsed {} principle items for user {}", len(items), user_id)
     await state.clear()
 
     if not items:
@@ -115,6 +123,7 @@ async def receive_principles(message: Message, state: FSMContext):
 async def cmd_reminder(message: Message, state: FSMContext):
     """Set or view daily reminder time."""
     user_id = message.from_user.id
+    logger.info("Reminder command received from user {}", user_id)
     now = datetime.now(SERVER_TZINFO)
     tzname = now.tzname() or "local time"
     existing = load_time_config(user_id)
@@ -133,7 +142,9 @@ async def receive_time(message: Message, state: FSMContext, bot: Bot):
     """Receive and set reminder time."""
     user_id = message.from_user.id
     text = (message.text or "").strip()
+    logger.info("Received time '{}' from user {}", text, user_id)
     if not re.fullmatch(r"([01]?\d|2[0-3]):([0-5]\d)", text):
+        logger.warning("Invalid time format '{}' from user {}", text, user_id)
         await message.answer(
             "❗️Please send time as HH:MM in 24h format (e.g., 07:30 or 19:05)."
         )
@@ -142,7 +153,13 @@ async def receive_time(message: Message, state: FSMContext, bot: Bot):
     save_time_config(user_id, text)
     try:
         schedule_daily_job_for_user(bot, user_id, text)
+        logger.info(
+            "Successfully scheduled daily reminder for user {} at {}", user_id, text
+        )
     except Exception as e:
+        logger.error(
+            "Failed to schedule reminder for user {} at {}: {}", user_id, text, e
+        )
         await message.answer(
             "I couldn't schedule that time due to an internal error. Please try again."
         )
@@ -161,6 +178,7 @@ async def receive_time(message: Message, state: FSMContext, bot: Bot):
 async def cmd_test_principle(message: Message, bot: Bot):
     """Send a random principle immediately."""
     user_id = message.from_user.id
+    logger.info("Test principle command received from user {}", user_id)
     raw = load_raw_principles(user_id)
 
     if not raw:
@@ -178,4 +196,7 @@ async def cmd_test_principle(message: Message, bot: Bot):
         return
 
     item = random.choice(items)
+    logger.info(
+        "Sending test principle '{}' to user {}", " -> ".join(item.path), user_id
+    )
     await send_principle_message(bot, user_id, item)
