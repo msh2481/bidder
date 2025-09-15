@@ -2,6 +2,10 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 # Note: BOT_TOKEN validation is done in main.py to allow importing modules for testing
 

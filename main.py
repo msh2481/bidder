@@ -4,7 +4,6 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
-from dotenv import load_dotenv
 from loguru import logger
 
 from bot.common.config import BOT_TOKEN
@@ -18,8 +17,6 @@ from bot.principles.scheduler import (
     shutdown_scheduler,
     start_scheduler,
 )
-
-load_dotenv()
 
 
 async def set_main_menu(bot: Bot):
