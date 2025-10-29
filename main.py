@@ -11,12 +11,14 @@ from bot.common.config import BOT_TOKEN
 if not BOT_TOKEN:
     raise ValueError("No bot token found. Set the BOT_TOKEN environment variable.")
 from bot.empathy.handlers import router as empathy_router
+from bot.lisa.handlers import router as lisa_router
 from bot.principles.handlers import router as principles_router
 from bot.principles.scheduler import (
     load_existing_schedules,
     shutdown_scheduler,
     start_scheduler,
 )
+from bot.lisa.reminders import load_existing_lisa_schedules
 
 
 async def set_main_menu(bot: Bot):
@@ -38,6 +40,10 @@ async def set_main_menu(bot: Bot):
         BotCommand(command="/remove_principle", description="Remove a principle by ID"),
         BotCommand(command="/reminder", description="Set daily reminder time"),
         BotCommand(command="/test_principle", description="Send random principle now"),
+        # Lisa reminders
+        BotCommand(command="/lisa_on", description="Enable Lisa reminders"),
+        BotCommand(command="/lisa_off", description="Disable Lisa reminders"),
+        BotCommand(command="/lisa_test", description="Test Lisa reminder"),
     ]
     await bot.set_my_commands(main_menu_commands)
     logger.info("Main menu commands set successfully")
@@ -59,6 +65,9 @@ async def cmd_start(message: types.Message):
         "• Use /principles to see all your principles\n"
         "• Use /reminder to get daily reminders at your preferred time\n"
         "• Use /test_principle to get a random principle now\n\n"
+        "💕 **Lisa Reminders**\n"
+        "• Use /lisa_on to enable daily Lisa reminders (4-8pm)\n"
+        "• Use /lisa_test to see a sample reminder\n\n"
         "Type /help for more details about commands."
     )
 
@@ -83,10 +92,15 @@ async def cmd_help(message: types.Message):
         "• /remove_principle <id> - Remove a principle by ID\n"
         "• /reminder [HH:MM] - Set/view daily reminder time\n"
         "• /test_principle - Send a random principle immediately\n\n"
+        "**Lisa Reminders:**\n"
+        "• /lisa_on - Enable daily Lisa reminders (4-8pm)\n"
+        "• /lisa_off - Disable Lisa reminders\n"
+        "• /lisa_test - Test Lisa reminder message\n\n"
         "**Usage:**\n"
         "1. Use /start_empathy → forward/type messages → /process to analyze\n"
         "2. Use /add_principle to build your principles collection\n"
-        "3. Configure reminder time for daily principle delivery"
+        "3. Configure reminder time for daily principle delivery\n"
+        "4. Use /lisa_on for daily Lisa reminders with relationship suggestions"
     )
 
 
@@ -100,6 +114,7 @@ async def main():
     logger.info("Including routers...")
     dp.include_router(empathy_router)
     dp.include_router(principles_router)
+    dp.include_router(lisa_router)
 
     # Set main menu
     await set_main_menu(bot)
@@ -107,8 +122,11 @@ async def main():
     # Start scheduler and restore existing schedules
     logger.info("Starting scheduler...")
     start_scheduler()
-    restored = load_existing_schedules(bot)
-    logger.info("Restored {} scheduled users from disk", restored)
+    restored_principles = load_existing_schedules(bot)
+    from bot.principles.scheduler import scheduler
+    restored_lisa = load_existing_lisa_schedules(scheduler, bot)
+    logger.info("Restored {} principle schedules and {} Lisa schedules from disk", 
+               restored_principles, restored_lisa)
 
     # Start polling
     logger.info("Starting bot polling...")
